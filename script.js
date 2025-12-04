@@ -881,12 +881,47 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (copyInviteBtn) {
-                copyInviteBtn.addEventListener('click', () => {
+                copyInviteBtn.addEventListener('click', async () => {
                     const inviteLink = document.getElementById('inviteLink');
-                    if (inviteLink) {
-                        navigator.clipboard.writeText(inviteLink.textContent).then(() => {
+                    if (!inviteLink) {
+                        customAlert('Ссылка не найдена', 'Ошибка');
+                        return;
+                    }
+                    
+                    const linkText = inviteLink.textContent || inviteLink.innerText;
+                    if (!linkText || linkText.trim() === '') {
+                        customAlert('Ссылка пуста. Дождитесь создания игры.', 'Ошибка');
+                        return;
+                    }
+                    
+                    try {
+                        // Пробуем использовать Clipboard API
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(linkText.trim());
                             customAlert('Ссылка скопирована!', 'Успешно');
-                        });
+                        } else {
+                            // Fallback: создаём временный input элемент
+                            const tempInput = document.createElement('input');
+                            tempInput.value = linkText.trim();
+                            tempInput.style.position = 'fixed';
+                            tempInput.style.opacity = '0';
+                            document.body.appendChild(tempInput);
+                            tempInput.select();
+                            tempInput.setSelectionRange(0, 99999); // Для мобильных
+                            
+                            try {
+                                document.execCommand('copy');
+                                customAlert('Ссылка скопирована!', 'Успешно');
+                            } catch (err) {
+                                customAlert('Не удалось скопировать ссылку. Скопируйте вручную: ' + linkText.trim(), 'Ошибка');
+                            }
+                            
+                            document.body.removeChild(tempInput);
+                        }
+                    } catch (error) {
+                        console.error('Error copying link:', error);
+                        // Показываем ссылку в алерте, чтобы пользователь мог скопировать вручную
+                        customAlert('Скопируйте ссылку вручную:\n\n' + linkText.trim(), 'Ссылка');
                     }
                 });
             }
