@@ -162,20 +162,42 @@ const initializeGame = () => {
 };
 
 const handleMove = (index) => {
-    if (!gameState.gameActive || gameState.board[index] || !elements.cells) return;
+    if (multiplayerState.isMultiplayer) {
+        // В многопользовательском режиме проверяем, наш ли это ход
+        if (gameState.currentPlayer !== multiplayerState.mySymbol) {
+            if (isTelegramWebApp) {
+                try {
+                    Telegram.showAlert('Сейчас не ваш ход!', () => {});
+                } catch (e) {
+                    alert('Сейчас не ваш ход!');
+                }
+            } else {
+                alert('Сейчас не ваш ход!');
+            }
+            return;
+        }
+        
+        if (!gameState.gameActive || gameState.board[index] || !elements.cells) return;
+        
+        vibrate();
+        sendMoveToServer(index);
+    } else {
+        // Одиночная игра
+        if (!gameState.gameActive || gameState.board[index] || !elements.cells) return;
 
-    vibrate();
-    gameState.board[index] = gameState.currentPlayer;
-    const icon = gameState.currentPlayer === 'X' 
-        ? '<i class="fas fa-times"></i>' 
-        : '<i class="far fa-circle"></i>';
-    
-    if (elements.cells[index]) {
-        elements.cells[index].innerHTML = icon;
-        elements.cells[index].classList.add(gameState.currentPlayer);
+        vibrate();
+        gameState.board[index] = gameState.currentPlayer;
+        const icon = gameState.currentPlayer === 'X' 
+            ? '<i class="fas fa-times"></i>' 
+            : '<i class="far fa-circle"></i>';
+        
+        if (elements.cells[index]) {
+            elements.cells[index].innerHTML = icon;
+            elements.cells[index].classList.add(gameState.currentPlayer);
+        }
+
+        checkResult();
     }
-
-    checkResult();
 };
 
 const checkResult = () => {
