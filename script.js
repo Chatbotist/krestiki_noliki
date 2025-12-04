@@ -20,14 +20,30 @@ const Telegram = isTelegramWebApp ? window.Telegram.WebApp : {
     initDataUnsafe: {}
 };
 
-// Инициализация Telegram Mini App (только если доступно)
+// Безопасная инициализация Telegram Mini App
 if (isTelegramWebApp) {
-    Telegram.ready();
-    Telegram.expand();
-    Telegram.requestFullscreen();
-    Telegram.disableVerticalSwipes();
-    Telegram.lockOrientation("portrait");
-    Telegram.enableClosingConfirmation();
+    try {
+        Telegram.ready();
+        Telegram.expand();
+    } catch (e) {
+        console.warn('Telegram WebApp init error:', e);
+    }
+    
+    // Безопасный вызов методов с проверкой поддержки
+    const safeCall = (method, ...args) => {
+        try {
+            if (Telegram[method]) {
+                Telegram[method](...args);
+            }
+        } catch (e) {
+            console.warn(`Telegram method ${method} not supported:`, e);
+        }
+    };
+    
+    safeCall('requestFullscreen');
+    safeCall('disableVerticalSwipes');
+    safeCall('lockOrientation', 'portrait');
+    safeCall('enableClosingConfirmation');
 }
 
 // Получение параметров из URL для Telegram Game
@@ -97,21 +113,28 @@ const initializeGame = () => {
     const cellContainers = document.querySelectorAll('.cell-container');
     cellContainers.forEach(container => {
         container.style.pointerEvents = 'auto';
+        container.classList.remove('winning-cell');
     });
     
     if (isTelegramWebApp) {
-        Telegram.MainButton.hide();
+        try {
+            Telegram.MainButton.hide();
+        } catch (e) {
+            console.warn('MainButton.hide error:', e);
+        }
     } else {
-        // Скрываем кнопку "Новая игра" для обычного браузера
+        // В обычном браузере кнопка всегда видна, но меняем текст
         const newGameBtn = document.getElementById('newGameBtn');
         if (newGameBtn) {
-            newGameBtn.style.display = 'none';
+            newGameBtn.textContent = 'Новая игра';
+            newGameBtn.style.display = 'block';
+            newGameBtn.style.backgroundColor = '#4CAF50';
         }
     }
 };
 
 const handleMove = (index) => {
-    if (!gameState.gameActive || gameState.board[index]) return;
+    if (!gameState.gameActive || gameState.board[index] || !elements.cells) return;
 
     vibrate();
     gameState.board[index] = gameState.currentPlayer;
@@ -119,8 +142,10 @@ const handleMove = (index) => {
         ? '<i class="fas fa-times"></i>' 
         : '<i class="far fa-circle"></i>';
     
-    elements.cells[index].innerHTML = icon;
-    elements.cells[index].classList.add(gameState.currentPlayer);
+    if (elements.cells[index]) {
+        elements.cells[index].innerHTML = icon;
+        elements.cells[index].classList.add(gameState.currentPlayer);
+    }
 
     checkResult();
 };
@@ -193,7 +218,7 @@ const endGame = (message) => {
 
         Telegram.showAlert(message, () => {});
     } else {
-        // Для обычного браузера показываем кнопку "Новая игра"
+        // Для обычного браузера обновляем кнопку "Новая игра"
         const newGameBtn = document.getElementById('newGameBtn');
         if (newGameBtn) {
             newGameBtn.style.display = 'block';
@@ -205,14 +230,19 @@ const endGame = (message) => {
             } else {
                 newGameBtn.style.backgroundColor = '#4CAF50';
             }
+            newGameBtn.textContent = 'Новая игра';
         }
-        alert(message);
+        setTimeout(() => alert(message), 100);
     }
 };
 
 const updateScore = () => {
-    elements.scoreX.textContent = gameState.score.X;
-    elements.scoreO.textContent = gameState.score.O;
+    if (elements.scoreX) {
+        elements.scoreX.textContent = gameState.score.X;
+    }
+    if (elements.scoreO) {
+        elements.scoreO.textContent = gameState.score.O;
+    }
 };
 
 // Отправка результата игры в Telegram
@@ -255,13 +285,27 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Event Listeners для игрового поля
     elements.board.addEventListener('click', (e) => {
-        // Ищем ближайший cell-container
-        const cellContainer = e.target.closest('.cell-container');
-        if (cellContainer && cellContainer.dataset.index !== undefined) {
-            const index = parseInt(cellContainer.dataset.index);
-            handleMove(index);
+        e.stopPropagation();
+        
+        // Ищем ближайший cell-container (может быть клик по .cell, иконке или .cell-container)
+        let cellContainer = e.target.closest('.cell-container');
+        
+        // Если клик был по .cell, ищем родительский .cell-container
+        if (!cellContainer) {
+            if (e.target.classList.contains('cell')) {
+                cellContainer = e.target.parentElement;
+            } else if (e.target.closest('.cell')) {
+                cellContainer = e.target.closest('.cell').parentElement;
+            }
         }
-    });
+        
+        if (cellContainer && cellContainer.dataset && cellContainer.dataset.index !== undefined) {
+            const index = parseInt(cellContainer.dataset.index);
+            if (!isNaN(index) && index >= 0 && index < 9) {
+                handleMove(index);
+            }
+        }
+    }, true); // Используем capture phase для более надежной обработки
     
     // Обработчик кнопки "Новая игра" для обычного браузера
     const newGameBtn = document.getElementById('newGameBtn');
@@ -269,6 +313,14 @@ document.addEventListener('DOMContentLoaded', () => {
         newGameBtn.addEventListener('click', () => {
             initializeGame();
         });
+    }
+    
+    // Скрываем кнопку "Новая игра" в Telegram WebApp (там используется MainButton)
+    if (isTelegramWebApp) {
+        const newGameBtn = document.getElementById('newGameBtn');
+        if (newGameBtn) {
+            newGameBtn.style.display = 'none';
+        }
     }
     
     // Инициализация игры
