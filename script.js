@@ -112,6 +112,7 @@ let gameState = {
     score: { X: 0, O: 0 },
     gameActive: true,
     winner: null,
+    resultShown: false, // чтобы не показывать алерт несколько раз
     totalWins: 0, // Общее количество побед для отправки в Telegram
     isPlayerX: true // Игрок играет за X
 };
@@ -126,6 +127,7 @@ const initializeGame = () => {
     gameState.board.fill('');
     gameState.gameActive = true;
     gameState.winner = null;
+    gameState.resultShown = false;
     gameState.currentPlayer = 'X';
     
     if (elements.cells) {
@@ -244,6 +246,10 @@ const highlightWin = () => {
 };
 
 const endGame = (message) => {
+    // Если уже показывали результат на этом клиенте, выходим
+    if (gameState.resultShown) return;
+    gameState.resultShown = true;
+
     gameState.gameActive = false;
     
     // Отключаем клики на всех ячейках
@@ -506,7 +512,7 @@ const updateGameFromServer = (serverState) => {
     updateBoardUI();
     updateCurrentPlayerIndicator();
     
-    if (serverState.winner) {
+    if (serverState.winner && !gameState.resultShown) {
         endGame(serverState.winner === 'draw' ? 'Ничья!' : `Игрок ${serverState.winner} выиграл!`);
     }
 };
