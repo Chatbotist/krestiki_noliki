@@ -1,3 +1,7 @@
+// URL бэкенда на Render (замените на ваш URL после деплоя)
+// Можно также установить через переменную окружения или конфиг
+const BACKEND_URL = 'https://your-backend.onrender.com'; // ЗАМЕНИТЕ НА ВАШ URL!
+
 // Проверка наличия Telegram WebApp API и создание fallback
 const isTelegramWebApp = window.Telegram && window.Telegram.WebApp;
 const Telegram = isTelegramWebApp ? window.Telegram.WebApp : {
@@ -358,7 +362,7 @@ const sendGameScore = async (score) => {
 // Создание новой игры
 const createMultiplayerGame = async () => {
     try {
-        const response = await fetch('/api/createGame', {
+        const response = await fetch(`${BACKEND_URL}/api/createGame`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -406,7 +410,7 @@ const createMultiplayerGame = async () => {
 // Присоединение к игре
 const joinMultiplayerGame = async (gameId) => {
     try {
-        const response = await fetch('/api/joinGame', {
+        const response = await fetch(`${BACKEND_URL}/api/joinGame`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -446,7 +450,7 @@ const sendMoveToServer = async (cellIndex) => {
     if (!multiplayerState.isMultiplayer || !multiplayerState.gameId) return;
     
     try {
-        const response = await fetch('/api/makeMove', {
+        const response = await fetch(`${BACKEND_URL}/api/makeMove`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -472,7 +476,7 @@ const getGameState = async () => {
     if (!multiplayerState.isMultiplayer || !multiplayerState.gameId) return;
     
     try {
-        const response = await fetch(`/api/getGameState?gameId=${multiplayerState.gameId}&userId=${gameParams.userId}`);
+        const response = await fetch(`${BACKEND_URL}/api/getGameState?gameId=${multiplayerState.gameId}&userId=${gameParams.userId}`);
         const data = await response.json();
         
         if (data.success) {
