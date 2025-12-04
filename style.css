@@ -61,6 +61,32 @@ h1 {
     color: #f44336;
 }
 
+.current-player-indicator {
+    margin: 15px 0;
+    padding: 10px 20px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 25px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.current-player-indicator.X {
+    background-color: rgba(33, 150, 243, 0.1);
+    color: #2196F3;
+    border: 2px solid #2196F3;
+}
+
+.current-player-indicator.O {
+    background-color: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+    border: 2px solid #f44336;
+}
+
+.current-player-indicator i {
+    margin-right: 8px;
+}
+
 .board {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

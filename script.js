@@ -123,13 +123,17 @@ const initializeGame = () => {
             console.warn('MainButton.hide error:', e);
         }
     } else {
-        // В обычном браузере кнопка всегда видна, но меняем текст
+        // В обычном браузере кнопка всегда видна и активна
         const newGameBtn = document.getElementById('newGameBtn');
         if (newGameBtn) {
             newGameBtn.textContent = 'Новая игра';
             newGameBtn.style.display = 'block';
             newGameBtn.style.backgroundColor = '#4CAF50';
+            newGameBtn.disabled = false;
+            newGameBtn.style.opacity = '1';
+            newGameBtn.style.cursor = 'pointer';
         }
+        updateCurrentPlayerIndicator();
     }
 };
 
@@ -169,6 +173,9 @@ const checkResult = () => {
         endGame('Ничья!');
     } else {
         gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+        if (!isTelegramWebApp) {
+            updateCurrentPlayerIndicator();
+        }
     }
 };
 
@@ -245,6 +252,21 @@ const updateScore = () => {
     }
 };
 
+// Обновление индикатора текущего игрока для обычного браузера
+const updateCurrentPlayerIndicator = () => {
+    if (!isTelegramWebApp) {
+        const currentPlayerIndicator = document.getElementById('currentPlayerIndicator');
+        if (currentPlayerIndicator) {
+            const playerName = gameState.currentPlayer === 'X' ? 'Крестики' : 'Нолики';
+            const playerIcon = gameState.currentPlayer === 'X' 
+                ? '<i class="fas fa-times"></i>' 
+                : '<i class="far fa-circle"></i>';
+            currentPlayerIndicator.innerHTML = `${playerIcon} Ход: ${playerName}`;
+            currentPlayerIndicator.className = `current-player-indicator ${gameState.currentPlayer}`;
+        }
+    }
+};
+
 // Отправка результата игры в Telegram
 const sendGameScore = async (score) => {
     if (!isTelegramGame) return;
@@ -315,11 +337,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Скрываем кнопку "Новая игра" в Telegram WebApp (там используется MainButton)
+    // Настройка UI в зависимости от окружения
     if (isTelegramWebApp) {
+        // В Telegram WebApp скрываем наши кнопки (используется MainButton)
         const newGameBtn = document.getElementById('newGameBtn');
         if (newGameBtn) {
             newGameBtn.style.display = 'none';
+        }
+        const currentPlayerIndicator = document.getElementById('currentPlayerIndicator');
+        if (currentPlayerIndicator) {
+            currentPlayerIndicator.style.display = 'none';
+        }
+    } else {
+        // В обычном браузере показываем все наши элементы управления
+        const newGameBtn = document.getElementById('newGameBtn');
+        if (newGameBtn) {
+            newGameBtn.style.display = 'block';
+        }
+        const currentPlayerIndicator = document.getElementById('currentPlayerIndicator');
+        if (currentPlayerIndicator) {
+            currentPlayerIndicator.style.display = 'block';
         }
     }
     
