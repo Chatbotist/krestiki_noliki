@@ -56,17 +56,29 @@ if (isTelegramWebApp) {
     safeCall('lockOrientation', 'portrait');
 }
 
-// Получение параметров из URL для Telegram Game
+// Получение параметров из URL для Telegram Game и многопользовательской игры
 const urlParams = new URLSearchParams(window.location.search);
 const gameParams = {
-    userId: urlParams.get('user_id') || Telegram.initDataUnsafe?.user?.id,
+    userId: urlParams.get('user_id') || Telegram.initDataUnsafe?.user?.id || `user_${Date.now()}`,
     chatId: urlParams.get('chat_id'),
     messageId: urlParams.get('message_id'),
-    inlineMessageId: urlParams.get('inline_message_id')
+    inlineMessageId: urlParams.get('inline_message_id'),
+    gameId: urlParams.get('gameId'), // ID многопользовательской игры
+    player: urlParams.get('player') // 1 или 2
 };
 
 // Проверка, запущена ли игра как Telegram Game
 const isTelegramGame = !!(gameParams.userId && (gameParams.chatId || gameParams.inlineMessageId));
+
+// Многопользовательский режим
+let multiplayerState = {
+    isMultiplayer: false,
+    gameId: null,
+    playerNumber: null, // 1 или 2
+    mySymbol: null, // 'X' или 'O'
+    opponentConnected: false,
+    pollingInterval: null
+};
 
 const vibrate = () => {
     if ('vibrate' in navigator) {
@@ -319,6 +331,218 @@ const sendGameScore = async (score) => {
     }
 };
 
+// ========== МНОГОПОЛЬЗОВАТЕЛЬСКИЙ РЕЖИМ ==========
+
+// Создание новой игры
+const createMultiplayerGame = async () => {
+    try {
+        const response = await fetch('/api/createGame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: gameParams.userId,
+                userName: Telegram.initDataUnsafe?.user?.first_name || 'Player'
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            multiplayerState.isMultiplayer = true;
+            multiplayerState.gameId = data.gameId;
+            multiplayerState.playerNumber = 1;
+            multiplayerState.mySymbol = 'X';
+            
+            // Показываем экран ожидания
+            showWaitingScreen(data.inviteLink);
+            
+            // Начинаем polling для проверки присоединения оппонента
+            startPolling();
+        }
+    } catch (error) {
+        console.error('Error creating game:', error);
+        alert('Ошибка при создании игры');
+    }
+};
+
+// Присоединение к игре
+const joinMultiplayerGame = async (gameId) => {
+    try {
+        const response = await fetch('/api/joinGame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                gameId: gameId,
+                userId: gameParams.userId,
+                userName: Telegram.initDataUnsafe?.user?.first_name || 'Player'
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            multiplayerState.isMultiplayer = true;
+            multiplayerState.gameId = data.gameSession.gameId;
+            multiplayerState.playerNumber = 2;
+            multiplayerState.mySymbol = 'O';
+            multiplayerState.opponentConnected = true;
+            
+            // Обновляем состояние игры
+            updateGameFromServer(data.gameSession);
+            
+            // Показываем игровой экран
+            showGameScreen();
+            
+            // Начинаем polling
+            startPolling();
+        } else {
+            alert(data.error || 'Ошибка при присоединении к игре');
+        }
+    } catch (error) {
+        console.error('Error joining game:', error);
+        alert('Ошибка при присоединении к игре');
+    }
+};
+
+// Отправка хода на сервер
+const sendMoveToServer = async (cellIndex) => {
+    if (!multiplayerState.isMultiplayer || !multiplayerState.gameId) return;
+    
+    try {
+        const response = await fetch('/api/makeMove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                gameId: multiplayerState.gameId,
+                userId: gameParams.userId,
+                cellIndex: cellIndex
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            updateGameFromServer(data.gameSession);
+        } else {
+            alert(data.error || 'Ошибка при отправке хода');
+        }
+    } catch (error) {
+        console.error('Error sending move:', error);
+    }
+};
+
+// Получение состояния игры с сервера
+const getGameState = async () => {
+    if (!multiplayerState.isMultiplayer || !multiplayerState.gameId) return;
+    
+    try {
+        const response = await fetch(`/api/getGameState?gameId=${multiplayerState.gameId}&userId=${gameParams.userId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Проверяем, присоединился ли оппонент
+            if (data.gameSession.player2 && !multiplayerState.opponentConnected) {
+                multiplayerState.opponentConnected = true;
+                showGameScreen();
+            }
+            
+            // Обновляем состояние игры
+            updateGameFromServer(data.gameSession);
+        }
+    } catch (error) {
+        console.error('Error getting game state:', error);
+    }
+};
+
+// Обновление игры из данных сервера
+const updateGameFromServer = (serverState) => {
+    gameState.board = [...serverState.board];
+    gameState.currentPlayer = serverState.currentPlayer;
+    gameState.gameActive = serverState.gameActive;
+    gameState.winner = serverState.winner;
+    
+    // Обновляем UI
+    updateBoardUI();
+    updateCurrentPlayerIndicator();
+    
+    if (serverState.winner) {
+        endGame(serverState.winner === 'draw' ? 'Ничья!' : `Игрок ${serverState.winner} выиграл!`);
+    }
+};
+
+// Обновление доски в UI
+const updateBoardUI = () => {
+    if (!elements.cells) return;
+    
+    elements.cells.forEach((cell, index) => {
+        const symbol = gameState.board[index];
+        if (symbol) {
+            const icon = symbol === 'X' 
+                ? '<i class="fas fa-times"></i>' 
+                : '<i class="far fa-circle"></i>';
+            cell.innerHTML = icon;
+            cell.classList.add(symbol);
+        } else {
+            cell.innerHTML = '';
+            cell.classList.remove('X', 'O');
+        }
+    });
+};
+
+// Polling для обновления состояния
+const startPolling = () => {
+    if (multiplayerState.pollingInterval) {
+        clearInterval(multiplayerState.pollingInterval);
+    }
+    
+    multiplayerState.pollingInterval = setInterval(() => {
+        if (multiplayerState.isMultiplayer && multiplayerState.gameId) {
+            getGameState();
+        }
+    }, 1000); // Проверяем каждую секунду
+};
+
+const stopPolling = () => {
+    if (multiplayerState.pollingInterval) {
+        clearInterval(multiplayerState.pollingInterval);
+        multiplayerState.pollingInterval = null;
+    }
+};
+
+// Показ экранов
+const showGameModeScreen = () => {
+    document.getElementById('gameModeScreen').style.display = 'block';
+    document.getElementById('waitingScreen').style.display = 'none';
+    document.getElementById('joinScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'none';
+};
+
+const showWaitingScreen = (inviteLink) => {
+    document.getElementById('gameModeScreen').style.display = 'none';
+    document.getElementById('waitingScreen').style.display = 'block';
+    document.getElementById('joinScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'none';
+    
+    const inviteLinkEl = document.getElementById('inviteLink');
+    if (inviteLinkEl) {
+        inviteLinkEl.textContent = inviteLink;
+    }
+};
+
+const showJoinScreen = () => {
+    document.getElementById('gameModeScreen').style.display = 'none';
+    document.getElementById('waitingScreen').style.display = 'none';
+    document.getElementById('joinScreen').style.display = 'block';
+    document.getElementById('gameScreen').style.display = 'none';
+};
+
+const showGameScreen = () => {
+    document.getElementById('gameModeScreen').style.display = 'none';
+    document.getElementById('waitingScreen').style.display = 'none';
+    document.getElementById('joinScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'block';
+};
+
+// ========== КОНЕЦ МНОГОПОЛЬЗОВАТЕЛЬСКОГО РЕЖИМА ==========
+
+
 // Инициализация при загрузке DOM
 document.addEventListener('DOMContentLoaded', () => {
     // Инициализируем элементы
@@ -395,6 +619,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Инициализация игры
-    initializeGame();
+    // Проверяем, есть ли gameId в URL (присоединение к игре)
+    if (gameParams.gameId) {
+        joinMultiplayerGame(gameParams.gameId);
+    } else {
+        // Показываем экран выбора режима (только если не Telegram Game)
+        if (!isTelegramGame) {
+            showGameModeScreen();
+            
+            // Обработчики кнопок
+            const createGameBtn = document.getElementById('createGameBtn');
+            const joinGameBtn = document.getElementById('joinGameBtn');
+            const copyInviteBtn = document.getElementById('copyInviteBtn');
+            const joinGameConfirmBtn = document.getElementById('joinGameConfirmBtn');
+            
+            if (createGameBtn) {
+                createGameBtn.addEventListener('click', createMultiplayerGame);
+            }
+            
+            if (joinGameBtn) {
+                joinGameBtn.addEventListener('click', showJoinScreen);
+            }
+            
+            if (copyInviteBtn) {
+                copyInviteBtn.addEventListener('click', () => {
+                    const inviteLink = document.getElementById('inviteLink');
+                    if (inviteLink) {
+                        navigator.clipboard.writeText(inviteLink.textContent).then(() => {
+                            alert('Ссылка скопирована!');
+                        });
+                    }
+                });
+            }
+            
+            if (joinGameConfirmBtn) {
+                joinGameConfirmBtn.addEventListener('click', () => {
+                    const gameIdInput = document.getElementById('gameIdInput');
+                    if (gameIdInput && gameIdInput.value) {
+                        joinMultiplayerGame(gameIdInput.value);
+                    } else {
+                        alert('Введите ID игры');
+                    }
+                });
+            }
+        } else {
+            // Telegram Game - одиночная игра
+            showGameScreen();
+            initializeGame();
+        }
+    }
 });

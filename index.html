@@ -11,20 +11,42 @@
 <body>
     <div class="container">
         <h1>КРЕСТИКИ vs НОЛИКИ</h1>
-        <div class="scoreboard">
-            <div class="player">
-                <i class="fas fa-times player-icon blue"></i>
-                <span id="scoreX">0</span>
-            </div>
-            <div class="player">
-                <i class="far fa-circle player-icon red"></i>
-                <span id="scoreO">0</span>
-            </div>
+        
+        <!-- Экран выбора режима игры -->
+        <div id="gameModeScreen" class="game-mode-screen">
+            <button id="createGameBtn" class="mode-btn">Создать игру</button>
+            <button id="joinGameBtn" class="mode-btn">Присоединиться</button>
         </div>
-        <div id="currentPlayerIndicator" class="current-player-indicator X" style="display: none;">
-            <i class="fas fa-times"></i> Ход: Крестики
+        
+        <!-- Экран ожидания оппонента -->
+        <div id="waitingScreen" class="waiting-screen" style="display: none;">
+            <p>Ожидание оппонента...</p>
+            <div id="inviteLink" class="invite-link"></div>
+            <button id="copyInviteBtn" class="copy-btn">Копировать ссылку</button>
         </div>
-        <div class="board" id="board">
+        
+        <!-- Экран присоединения -->
+        <div id="joinScreen" class="join-screen" style="display: none;">
+            <input type="text" id="gameIdInput" placeholder="Введите ID игры" class="game-id-input">
+            <button id="joinGameConfirmBtn" class="join-btn">Присоединиться</button>
+        </div>
+        
+        <!-- Игровой экран -->
+        <div id="gameScreen" style="display: none;">
+            <div class="scoreboard">
+                <div class="player">
+                    <i class="fas fa-times player-icon blue"></i>
+                    <span id="scoreX">0</span>
+                </div>
+                <div class="player">
+                    <i class="far fa-circle player-icon red"></i>
+                    <span id="scoreO">0</span>
+                </div>
+            </div>
+            <div id="currentPlayerIndicator" class="current-player-indicator X" style="display: none;">
+                <i class="fas fa-times"></i> Ход: Крестики
+            </div>
+            <div class="board" id="board">
             <div class="cell-container" data-index="0"><div class="cell"></div></div>
             <div class="cell-container" data-index="1"><div class="cell"></div></div>
             <div class="cell-container" data-index="2"><div class="cell"></div></div>
@@ -34,8 +56,9 @@
             <div class="cell-container" data-index="6"><div class="cell"></div></div>
             <div class="cell-container" data-index="7"><div class="cell"></div></div>
             <div class="cell-container" data-index="8"><div class="cell"></div></div>
+            </div>
+            <button id="newGameBtn" class="new-game-btn" style="display: block;">Новая игра</button>
         </div>
-        <button id="newGameBtn" class="new-game-btn" style="display: block;">Новая игра</button>
     </div>
     <script src="script.js"></script>
 </body>
