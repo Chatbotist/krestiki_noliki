@@ -398,15 +398,8 @@ const createMultiplayerGame = async () => {
     } catch (error) {
         console.error('Error creating game:', error);
         const errorMsg = error.message || 'Ошибка при создании игры';
-        if (isTelegramWebApp) {
-            try {
-                Telegram.showAlert(errorMsg, () => {});
-            } catch (e) {
-                alert(errorMsg);
-            }
-        } else {
-            alert(errorMsg);
-        }
+        // Используем обычный alert вместо showAlert для совместимости
+        alert(errorMsg);
     }
 };
 
