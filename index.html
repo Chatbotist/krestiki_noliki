@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Крестики vs Нолики</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>КРЕСТИКИ vs НОЛИКИ</h1>
+        <div class="scoreboard">
+            <div class="player">
+                <i class="fas fa-times player-icon blue"></i>
+                <span id="scoreX">0</span>
+            </div>
+            <div class="player">
+                <i class="far fa-circle player-icon red"></i>
+                <span id="scoreO">0</span>
+            </div>
+        </div>
+        <div class="board" id="board">
+            <div class="cell-container" data-index="0"><div class="cell"></div></div>
+            <div class="cell-container" data-index="1"><div class="cell"></div></div>
+            <div class="cell-container" data-index="2"><div class="cell"></div></div>
+            <div class="cell-container" data-index="3"><div class="cell"></div></div>
+            <div class="cell-container" data-index="4"><div class="cell"></div></div>
+            <div class="cell-container" data-index="5"><div class="cell"></div></div>
+            <div class="cell-container" data-index="6"><div class="cell"></div></div>
+            <div class="cell-container" data-index="7"><div class="cell"></div></div>
+            <div class="cell-container" data-index="8"><div class="cell"></div></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "name": "krestiki-noliki",
+  "version": "1.0.0",
+  "description": "Крестики-Нолики на HTML, CSS и JavaScript",
+  "main": "index.html",
+  "scripts": {
+    "start": "http-server -p 3000 --mimetypes ./mime.json",
+    "build": "echo 'No build step required for static site'",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "http-server": "^14.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^28.0.0"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "vercel": {
+    "builds": [
+      {
+        "src": "index.html",
+        "use": "@vercel/static"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/static/(.*)",
+        "dest": "/$1"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "/index.html"
+      }
+    ]
+  }
+}
