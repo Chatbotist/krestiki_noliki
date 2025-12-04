@@ -49,10 +49,14 @@ export default async function handler(req, res) {
         }
     }
 
+    const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : (process.env.GAME_URL || 'https://krestiki-noliki-xpj9.vercel.app');
+    
     return res.status(200).json({
         success: true,
         gameId,
-        inviteLink: `${process.env.GAME_URL || 'https://your-app.vercel.app'}/?gameId=${gameId}&player=2`
+        inviteLink: `${baseUrl}/?gameId=${gameId}&player=2`
     });
 }
 

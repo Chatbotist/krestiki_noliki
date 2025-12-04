@@ -367,6 +367,19 @@ const createMultiplayerGame = async () => {
             })
         });
         
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error:', response.status, errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text);
+            throw new Error('Server returned non-JSON response');
+        }
+        
         const data = await response.json();
         if (data.success) {
             multiplayerState.isMultiplayer = true;
@@ -379,10 +392,21 @@ const createMultiplayerGame = async () => {
             
             // Начинаем polling для проверки присоединения оппонента
             startPolling();
+        } else {
+            throw new Error(data.error || 'Failed to create game');
         }
     } catch (error) {
         console.error('Error creating game:', error);
-        alert('Ошибка при создании игры');
+        const errorMsg = error.message || 'Ошибка при создании игры';
+        if (isTelegramWebApp) {
+            try {
+                Telegram.showAlert(errorMsg, () => {});
+            } catch (e) {
+                alert(errorMsg);
+            }
+        } else {
+            alert(errorMsg);
+        }
     }
 };
 
