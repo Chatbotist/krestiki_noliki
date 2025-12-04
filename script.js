@@ -19,8 +19,9 @@ const Telegram = isTelegramWebApp ? window.Telegram.WebApp : {
         onClick: () => {}
     },
     showAlert: (message, callback) => {
-        alert(message);
-        if (callback) callback();
+        customAlert(message).then(() => {
+            if (callback) callback();
+        });
     },
     initDataUnsafe: {}
 };
@@ -89,6 +90,72 @@ const vibrate = () => {
     if ('vibrate' in navigator) {
         navigator.vibrate(30);
     }
+};
+
+// ========== КАСТОМНЫЕ МОДАЛЬНЫЕ ОКНА ==========
+
+// Кастомный alert
+const customAlert = (message, title = 'Уведомление') => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalOkBtn = document.getElementById('modalOkBtn');
+        
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        modal.style.display = 'flex';
+        
+        const closeModal = () => {
+            modal.style.display = 'none';
+            resolve();
+        };
+        
+        modalOkBtn.onclick = closeModal;
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+    });
+};
+
+// Кастомный confirm
+const customConfirm = (message, title = 'Подтверждение') => {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customConfirmModal');
+        const confirmTitle = document.getElementById('confirmTitle');
+        const confirmMessage = document.getElementById('confirmMessage');
+        const confirmOkBtn = document.getElementById('confirmOkBtn');
+        const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+        
+        confirmTitle.textContent = title;
+        confirmMessage.textContent = message;
+        modal.style.display = 'flex';
+        
+        const closeModal = (result) => {
+            modal.style.display = 'none';
+            resolve(result);
+        };
+        
+        confirmOkBtn.onclick = () => closeModal(true);
+        confirmCancelBtn.onclick = () => closeModal(false);
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal(false);
+        };
+    });
+};
+
+// Показать индикатор ожидания
+const showWaitingIndicator = (text = 'Ожидание...') => {
+    const indicator = document.getElementById('waitingIndicator');
+    const waitingText = document.getElementById('waitingText');
+    waitingText.textContent = text;
+    indicator.style.display = 'flex';
+};
+
+// Скрыть индикатор ожидания
+const hideWaitingIndicator = () => {
+    const indicator = document.getElementById('waitingIndicator');
+    indicator.style.display = 'none';
 };
 
 // Инициализация элементов после загрузки DOM
@@ -178,15 +245,7 @@ const handleMove = (index) => {
     if (multiplayerState.isMultiplayer) {
         // В многопользовательском режиме проверяем, наш ли это ход
         if (gameState.currentPlayer !== multiplayerState.mySymbol) {
-            if (isTelegramWebApp) {
-                try {
-                    Telegram.showAlert('Сейчас не ваш ход!', () => {});
-                } catch (e) {
-                    alert('Сейчас не ваш ход!');
-                }
-            } else {
-                alert('Сейчас не ваш ход!');
-            }
+            customAlert('Сейчас не ваш ход!', 'Уведомление');
             return;
         }
         
@@ -299,7 +358,7 @@ const endGame = (message) => {
         try {
             Telegram.showAlert(message, () => {});
         } catch (e) {
-            alert(message);
+            customAlert(message, 'Результат игры');
         }
     } else {
         // Для обычного браузера обновляем кнопку "Новая игра"
@@ -316,7 +375,7 @@ const endGame = (message) => {
             }
             newGameBtn.textContent = 'Новая игра';
         }
-        setTimeout(() => alert(message), 100);
+        setTimeout(() => customAlert(message, 'Результат игры'), 100);
     }
 };
 
@@ -419,8 +478,7 @@ const createMultiplayerGame = async () => {
     } catch (error) {
         console.error('Error creating game:', error);
         const errorMsg = error.message || 'Ошибка при создании игры';
-        // Используем обычный alert вместо showAlert для совместимости
-        alert(errorMsg);
+        customAlert(errorMsg, 'Ошибка');
     }
 };
 
@@ -454,11 +512,11 @@ const joinMultiplayerGame = async (gameId) => {
             // Начинаем polling
             startPolling();
         } else {
-            alert(data.error || 'Ошибка при присоединении к игре');
+            customAlert(data.error || 'Ошибка при присоединении к игре', 'Ошибка');
         }
     } catch (error) {
         console.error('Error joining game:', error);
-        alert('Ошибка при присоединении к игре');
+        customAlert('Ошибка при присоединении к игре', 'Ошибка');
     }
 };
 
@@ -481,7 +539,7 @@ const sendMoveToServer = async (cellIndex) => {
         if (data.success) {
             updateGameFromServer(data.gameSession);
         } else {
-            alert(data.error || 'Ошибка при отправке хода');
+            customAlert(data.error || 'Ошибка при отправке хода', 'Ошибка');
         }
     } catch (error) {
         console.error('Error sending move:', error);
@@ -509,12 +567,16 @@ const requestNewRound = async () => {
         const data = await response.json();
         if (data.success) {
             updateGameFromServer(data.gameSession);
-            alert('Запрос на новый раунд отправлен. Ждём ответа соперника.');
+            // Показываем индикатор ожидания вместо alert
+            showWaitingIndicator('Ждём ответа соперника...');
         } else {
-            alert(data.error || 'Ошибка при запросе нового раунда');
+            hideWaitingIndicator();
+            customAlert(data.error || 'Ошибка при запросе нового раунда', 'Ошибка');
         }
     } catch (error) {
         console.error('Error requesting new round:', error);
+        hideWaitingIndicator();
+        customAlert('Ошибка при запросе нового раунда', 'Ошибка');
     }
 };
 
@@ -537,18 +599,24 @@ const respondToNewRound = async (accept) => {
 
         const data = await response.json();
         if (data.success) {
-            updateGameFromServer(data.gameSession);
             if (accept) {
-                // Игра уже сброшена на сервере, просто локально инициализируем
+                // Игра сброшена на сервере - обновляем состояние и инициализируем
+                gameState.winner = null;
+                gameState.resultShown = false;
+                gameState.resetDialogShown = false;
+                gameState.resetRejectedShown = false;
+                updateGameFromServer(data.gameSession);
                 initializeGame();
             } else {
-                alert('Вы отклонили предложение о новом раунде.');
+                updateGameFromServer(data.gameSession);
+                customAlert('Вы отклонили предложение о новом раунде.', 'Уведомление');
             }
         } else {
-            alert(data.error || 'Ошибка при обработке запроса нового раунда');
+            customAlert(data.error || 'Ошибка при обработке запроса нового раунда', 'Ошибка');
         }
     } catch (error) {
         console.error('Error responding to new round:', error);
+        customAlert('Ошибка при обработке запроса нового раунда', 'Ошибка');
     }
 };
 
@@ -587,8 +655,13 @@ const updateGameFromServer = (serverState) => {
     updateBoardUI();
     updateCurrentPlayerIndicator();
 
-    // Обработка завершённой игры
+    // Обработка завершённой игры (многопользовательский режим)
     if (serverState.winner && !gameState.resultShown) {
+        // В мультиплеере увеличиваем счёт победителя (кроме ничьи)
+        if (serverState.winner === 'X' || serverState.winner === 'O') {
+            gameState.score[serverState.winner] = (gameState.score[serverState.winner] || 0) + 1;
+            updateScore();
+        }
         endGame(serverState.winner === 'draw' ? 'Ничья!' : `Игрок ${serverState.winner} выиграл!`);
     }
 
@@ -600,19 +673,32 @@ const updateGameFromServer = (serverState) => {
         // Если запрос пришёл от соперника и мы ещё не показывали диалог
         if (pending.by !== myId && !gameState.resetDialogShown) {
             gameState.resetDialogShown = true;
-            const accept = confirm('Соперник предлагает сыграть ещё раз. Принять?');
-            respondToNewRound(accept);
+            customConfirm('Соперник предлагает сыграть ещё раз. Принять?', 'Новый раунд')
+                .then(accept => {
+                    respondToNewRound(accept);
+                });
+        }
+        // Если мы отправили запрос - показываем индикатор ожидания
+        if (pending.by === myId) {
+            showWaitingIndicator('Ждём ответа соперника...');
         }
     } else if (pending && pending.status === 'rejected') {
         // Наш запрос отклонён соперником
         if (pending.by === myId && !gameState.resetRejectedShown) {
             gameState.resetRejectedShown = true;
-            alert('Соперник отказался от нового раунда.');
+            hideWaitingIndicator();
+            customAlert('Соперник отказался от нового раунда.', 'Уведомление');
         }
     } else {
-        // Нет активного запроса — сбрасываем локальные флаги
+        // Нет активного запроса — скрываем индикатор и сбрасываем локальные флаги
+        hideWaitingIndicator();
         gameState.resetDialogShown = false;
         // resetRejectedShown сбрасывать не будем, чтобы не повторять сообщение
+    }
+
+    // Если игра активна и нет pending reset - скрываем индикатор
+    if (gameState.gameActive && !pending) {
+        hideWaitingIndicator();
     }
 };
 
@@ -799,7 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const inviteLink = document.getElementById('inviteLink');
                     if (inviteLink) {
                         navigator.clipboard.writeText(inviteLink.textContent).then(() => {
-                            alert('Ссылка скопирована!');
+                            customAlert('Ссылка скопирована!', 'Успешно');
                         });
                     }
                 });
@@ -811,7 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (gameIdInput && gameIdInput.value) {
                         joinMultiplayerGame(gameIdInput.value);
                     } else {
-                        alert('Введите ID игры');
+                        customAlert('Введите ID игры', 'Ошибка');
                     }
                 });
             }
