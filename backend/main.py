@@ -38,6 +38,7 @@ class MakeMoveRequest(BaseModel):
 class ResetGameRequest(BaseModel):
     gameId: str
     userId: str
+    action: str  # 'request', 'accept', 'reject'
 
 # Вспомогательные функции
 def check_winner(board: list) -> Optional[str]:
@@ -87,7 +88,8 @@ async def create_game(request: CreateGameRequest):
         "gameActive": False,
         "winner": None,
         "createdAt": datetime.now().isoformat(),
-        "lastMove": None
+        "lastMove": None,
+        "pendingReset": None  # информация о запросе нового раунда
     }
     
     games[game_id] = game_session
@@ -228,42 +230,98 @@ async def get_game_state(gameId: str, userId: Optional[str] = None):
             "currentPlayer": game["currentPlayer"],
             "gameActive": game["gameActive"],
             "winner": game["winner"],
-            "lastMove": game["lastMove"]
+            "lastMove": game["lastMove"],
+            "pendingReset": game.get("pendingReset"),
+        }
+    }
+    return {
+        "success": True,
+        "gameSession": {
+            "gameId": game["gameId"],
+            "player1": game["player1"],
+            "player2": game["player2"],
+            "board": game["board"],
+            "currentPlayer": game["currentPlayer"],
+            "gameActive": game["gameActive"],
+            "winner": game["winner"],
+            "lastMove": game["lastMove"],
+            "pendingReset": game.get("pendingReset"),
         }
     }
 
 @app.post("/api/resetGame")
 async def reset_game(request: ResetGameRequest):
-    """Сброс игры для нового раунда"""
+    """Логика нового раунда с подтверждением от соперника"""
     cleanup_old_games()
-    
+
     if request.gameId not in games:
         raise HTTPException(status_code=404, detail="Game not found")
-    
+
     game = games[request.gameId]
-    
+
     # Проверяем, что пользователь является игроком
     is_player1 = game["player1"]["userId"] == request.userId
     is_player2 = game["player2"] and game["player2"]["userId"] == request.userId
-    
+
     if not is_player1 and not is_player2:
         raise HTTPException(status_code=403, detail="You are not a player in this game")
-    
-    # Сбрасываем игру
-    game["board"] = ['', '', '', '', '', '', '', '', '']
-    game["currentPlayer"] = "X"
-    game["gameActive"] = True
-    game["winner"] = None
-    game["lastMove"] = None
-    
+
+    action = request.action.lower()
+    now_iso = datetime.now().isoformat()
+
+    # Инициатор просит новый раунд
+    if action == "request":
+        game["pendingReset"] = {
+            "by": request.userId,
+            "status": "requested",
+            "at": now_iso,
+        }
+
+    # Второй игрок принимает
+    elif action == "accept":
+        pending = game.get("pendingReset")
+        if not pending or pending["status"] != "requested":
+            raise HTTPException(status_code=400, detail="No reset request to accept")
+        if pending["by"] == request.userId:
+            raise HTTPException(status_code=400, detail="You cannot accept your own request")
+
+        # Сбрасываем игру
+        game["board"] = ['', '', '', '', '', '', '', '', '']
+        game["currentPlayer"] = "X"
+        game["gameActive"] = True
+        game["winner"] = None
+        game["lastMove"] = None
+        game["pendingReset"] = None
+
+    # Второй игрок отказывается
+    elif action == "reject":
+        pending = game.get("pendingReset")
+        if not pending or pending["status"] != "requested":
+            raise HTTPException(status_code=400, detail="No reset request to reject")
+        if pending["by"] == request.userId:
+            raise HTTPException(status_code=400, detail="You cannot reject your own request")
+
+        game["pendingReset"] = {
+            "by": pending["by"],
+            "status": "rejected",
+            "rejectedBy": request.userId,
+            "at": pending.get("at", now_iso),
+        }
+
+    else:
+        raise HTTPException(status_code=400, detail="Unknown reset action")
+
     return {
         "success": True,
         "gameSession": {
             "gameId": game["gameId"],
+            "player1": game["player1"],
+            "player2": game["player2"],
             "board": game["board"],
             "currentPlayer": game["currentPlayer"],
             "gameActive": game["gameActive"],
-            "winner": game["winner"]
+            "winner": game["winner"],
+            "pendingReset": game.get("pendingReset"),
         }
     }
 

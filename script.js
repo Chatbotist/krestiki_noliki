@@ -114,7 +114,10 @@ let gameState = {
     winner: null,
     resultShown: false, // чтобы не показывать алерт несколько раз
     totalWins: 0, // Общее количество побед для отправки в Telegram
-    isPlayerX: true // Игрок играет за X
+    isPlayerX: true, // Игрок играет за X
+    pendingReset: null,
+    resetDialogShown: false,
+    resetRejectedShown: false,
 };
 
 const winningCombinations = [
@@ -128,6 +131,9 @@ const initializeGame = () => {
     gameState.gameActive = true;
     gameState.winner = null;
     gameState.resultShown = false;
+    gameState.pendingReset = null;
+    gameState.resetDialogShown = false;
+    gameState.resetRejectedShown = false;
     gameState.currentPlayer = 'X';
     
     if (elements.cells) {
@@ -270,7 +276,7 @@ const endGame = (message) => {
         try {
             // Очищаем предыдущие обработчики
             Telegram.MainButton.offClick();
-            
+
             Telegram.MainButton
                 .setParams({
                     color: buttonColor,
@@ -279,8 +285,12 @@ const endGame = (message) => {
                 })
                 .show()
                 .onClick(() => {
-                    initializeGame();
-                    Telegram.MainButton.hide();
+                    if (multiplayerState.isMultiplayer) {
+                        requestNewRound();
+                    } else {
+                        initializeGame();
+                        Telegram.MainButton.hide();
+                    }
                 });
         } catch (e) {
             console.warn('MainButton error:', e);
@@ -478,6 +488,70 @@ const sendMoveToServer = async (cellIndex) => {
     }
 };
 
+// Запрос нового раунда
+const requestNewRound = async () => {
+    if (!multiplayerState.isMultiplayer || !multiplayerState.gameId) {
+        initializeGame();
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/resetGame`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                gameId: multiplayerState.gameId,
+                userId: gameParams.userId,
+                action: 'request',
+            }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            updateGameFromServer(data.gameSession);
+            alert('Запрос на новый раунд отправлен. Ждём ответа соперника.');
+        } else {
+            alert(data.error || 'Ошибка при запросе нового раунда');
+        }
+    } catch (error) {
+        console.error('Error requesting new round:', error);
+    }
+};
+
+// Ответ на запрос нового раунда
+const respondToNewRound = async (accept) => {
+    if (!multiplayerState.isMultiplayer || !multiplayerState.gameId) return;
+
+    const action = accept ? 'accept' : 'reject';
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/resetGame`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                gameId: multiplayerState.gameId,
+                userId: gameParams.userId,
+                action,
+            }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            updateGameFromServer(data.gameSession);
+            if (accept) {
+                // Игра уже сброшена на сервере, просто локально инициализируем
+                initializeGame();
+            } else {
+                alert('Вы отклонили предложение о новом раунде.');
+            }
+        } else {
+            alert(data.error || 'Ошибка при обработке запроса нового раунда');
+        }
+    } catch (error) {
+        console.error('Error responding to new round:', error);
+    }
+};
+
 // Получение состояния игры с сервера
 const getGameState = async () => {
     if (!multiplayerState.isMultiplayer || !multiplayerState.gameId) return;
@@ -507,13 +581,38 @@ const updateGameFromServer = (serverState) => {
     gameState.currentPlayer = serverState.currentPlayer;
     gameState.gameActive = serverState.gameActive;
     gameState.winner = serverState.winner;
+    gameState.pendingReset = serverState.pendingReset || null;
     
     // Обновляем UI
     updateBoardUI();
     updateCurrentPlayerIndicator();
-    
+
+    // Обработка завершённой игры
     if (serverState.winner && !gameState.resultShown) {
         endGame(serverState.winner === 'draw' ? 'Ничья!' : `Игрок ${serverState.winner} выиграл!`);
+    }
+
+    // Обработка запросов на новый раунд
+    const pending = gameState.pendingReset;
+    const myId = gameParams.userId;
+
+    if (pending && pending.status === 'requested') {
+        // Если запрос пришёл от соперника и мы ещё не показывали диалог
+        if (pending.by !== myId && !gameState.resetDialogShown) {
+            gameState.resetDialogShown = true;
+            const accept = confirm('Соперник предлагает сыграть ещё раз. Принять?');
+            respondToNewRound(accept);
+        }
+    } else if (pending && pending.status === 'rejected') {
+        // Наш запрос отклонён соперником
+        if (pending.by === myId && !gameState.resetRejectedShown) {
+            gameState.resetRejectedShown = true;
+            alert('Соперник отказался от нового раунда.');
+        }
+    } else {
+        // Нет активного запроса — сбрасываем локальные флаги
+        gameState.resetDialogShown = false;
+        // resetRejectedShown сбрасывать не будем, чтобы не повторять сообщение
     }
 };
 
@@ -632,7 +731,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const newGameBtn = document.getElementById('newGameBtn');
     if (newGameBtn) {
         newGameBtn.addEventListener('click', () => {
-            initializeGame();
+            if (multiplayerState.isMultiplayer) {
+                requestNewRound();
+            } else {
+                initializeGame();
+            }
         });
     }
     
