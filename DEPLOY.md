@@ -13,7 +13,7 @@
    - **Plan**: Free (или любой другой)
 
 5. В разделе **Environment Variables** добавьте:
-   - `FRONTEND_URL` = `https://krestiki-noliki-xpj9.vercel.app` (URL вашего фронтенда)
+   - `FRONTEND_URL` = `https://krestiki-noliki-liard.vercel.app` (URL вашего фронтенда)
 
 6. Нажмите "Create Web Service"
 7. Дождитесь деплоя (может занять 2-3 минуты)
@@ -26,9 +26,9 @@
    ```javascript
    const BACKEND_URL = 'https://your-backend.onrender.com';
    ```
-3. Замените на URL вашего бэкенда с Render:
+3. Замените на URL вашего бэкенда с Render (в вашем случае уже настроен):
    ```javascript
-   const BACKEND_URL = 'https://krestiki-noliki-backend.onrender.com';
+   const BACKEND_URL = 'https://krestiki-noliki-ykec.onrender.com';
    ```
 4. Сохраните и закоммитьте изменения:
    ```bash

@@ -1,6 +1,7 @@
-// URL бэкенда на Render (замените на ваш URL после деплоя)
-// Можно также установить через переменную окружения или конфиг
-const BACKEND_URL = 'https://your-backend.onrender.com'; // ЗАМЕНИТЕ НА ВАШ URL!
+// URL бэкенда на Render
+// В продакшене можно вынести в переменную окружения Vercel,
+// но сейчас используем конкретный URL сервиса Render.
+const BACKEND_URL = 'https://krestiki-noliki-ykec.onrender.com';
 
 // Проверка наличия Telegram WebApp API и создание fallback
 const isTelegramWebApp = window.Telegram && window.Telegram.WebApp;

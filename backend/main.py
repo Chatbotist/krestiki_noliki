@@ -94,7 +94,7 @@ async def create_game(request: CreateGameRequest):
     
     # Получаем базовый URL из переменных окружения
     import os
-    base_url = os.getenv("FRONTEND_URL", "https://krestiki-noliki-xpj9.vercel.app")
+    base_url = os.getenv("FRONTEND_URL", "https://krestiki-noliki-liard.vercel.app")
     
     return {
         "success": True,
