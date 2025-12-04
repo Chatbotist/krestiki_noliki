@@ -1,12 +1,34 @@
-const Telegram = window.Telegram.WebApp;
+// Проверка наличия Telegram WebApp API и создание fallback
+const isTelegramWebApp = window.Telegram && window.Telegram.WebApp;
+const Telegram = isTelegramWebApp ? window.Telegram.WebApp : {
+    ready: () => {},
+    expand: () => {},
+    requestFullscreen: () => {},
+    disableVerticalSwipes: () => {},
+    lockOrientation: () => {},
+    enableClosingConfirmation: () => {},
+    MainButton: {
+        hide: () => {},
+        show: () => ({ setParams: () => ({ onClick: () => {} }) }),
+        setParams: () => ({ show: () => ({ onClick: () => {} }) }),
+        onClick: () => {}
+    },
+    showAlert: (message, callback) => {
+        alert(message);
+        if (callback) callback();
+    },
+    initDataUnsafe: {}
+};
 
-// Инициализация Telegram Mini App
-Telegram.ready();
-Telegram.expand();
-Telegram.requestFullscreen();
-Telegram.disableVerticalSwipes();
-Telegram.lockOrientation("portrait");
-Telegram.enableClosingConfirmation();
+// Инициализация Telegram Mini App (только если доступно)
+if (isTelegramWebApp) {
+    Telegram.ready();
+    Telegram.expand();
+    Telegram.requestFullscreen();
+    Telegram.disableVerticalSwipes();
+    Telegram.lockOrientation("portrait");
+    Telegram.enableClosingConfirmation();
+}
 
 // Получение параметров из URL для Telegram Game
 const urlParams = new URLSearchParams(window.location.search);
@@ -26,11 +48,19 @@ const vibrate = () => {
     }
 };
 
-const elements = {
-    board: document.getElementById('board'),
-    cells: document.querySelectorAll('.cell'),
-    scoreX: document.getElementById('scoreX'),
-    scoreO: document.getElementById('scoreO')
+// Инициализация элементов после загрузки DOM
+let elements = {
+    board: null,
+    cells: null,
+    scoreX: null,
+    scoreO: null
+};
+
+const initElements = () => {
+    elements.board = document.getElementById('board');
+    elements.cells = document.querySelectorAll('.cell');
+    elements.scoreX = document.getElementById('scoreX');
+    elements.scoreO = document.getElementById('scoreO');
 };
 
 let gameState = {
@@ -53,12 +83,31 @@ const initializeGame = () => {
     gameState.board.fill('');
     gameState.gameActive = true;
     gameState.winner = null;
-    elements.cells.forEach(cell => {
-        cell.innerHTML = '';
-        cell.style.pointerEvents = 'auto';
-        cell.classList.remove('winning-cell', 'X', 'O');
+    gameState.currentPlayer = 'X';
+    
+    if (elements.cells) {
+        elements.cells.forEach(cell => {
+            cell.innerHTML = '';
+            cell.style.pointerEvents = 'auto';
+            cell.classList.remove('winning-cell', 'X', 'O');
+        });
+    }
+    
+    // Также очищаем cell-container
+    const cellContainers = document.querySelectorAll('.cell-container');
+    cellContainers.forEach(container => {
+        container.style.pointerEvents = 'auto';
     });
-    Telegram.MainButton.hide();
+    
+    if (isTelegramWebApp) {
+        Telegram.MainButton.hide();
+    } else {
+        // Скрываем кнопку "Новая игра" для обычного браузера
+        const newGameBtn = document.getElementById('newGameBtn');
+        if (newGameBtn) {
+            newGameBtn.style.display = 'none';
+        }
+    }
 };
 
 const handleMove = (index) => {
@@ -114,26 +163,51 @@ const highlightWin = () => {
 
 const endGame = (message) => {
     gameState.gameActive = false;
-    elements.cells.forEach(cell => cell.style.pointerEvents = 'none');
     
-    // Настройка кнопки в зависимости от результата
-    let buttonColor = '#4CAF50'; // Зеленый по умолчанию для ничьи
-    if (gameState.winner === 'X') buttonColor = '#2196F3';
-    if (gameState.winner === 'O') buttonColor = '#f44336';
+    // Отключаем клики на всех ячейках
+    if (elements.cells) {
+        elements.cells.forEach(cell => cell.style.pointerEvents = 'none');
+    }
+    const cellContainers = document.querySelectorAll('.cell-container');
+    cellContainers.forEach(container => {
+        container.style.pointerEvents = 'none';
+    });
+    
+    if (isTelegramWebApp) {
+        // Настройка кнопки в зависимости от результата для Telegram
+        let buttonColor = '#4CAF50'; // Зеленый по умолчанию для ничьи
+        if (gameState.winner === 'X') buttonColor = '#2196F3';
+        if (gameState.winner === 'O') buttonColor = '#f44336';
 
-    Telegram.MainButton
-        .setParams({
-            color: buttonColor,
-            text_color: '#ffffff',
-            text: 'Новая игра'
-        })
-        .show()
-        .onClick(() => {
-            initializeGame();
-            Telegram.MainButton.hide();
-        });
+        Telegram.MainButton
+            .setParams({
+                color: buttonColor,
+                text_color: '#ffffff',
+                text: 'Новая игра'
+            })
+            .show()
+            .onClick(() => {
+                initializeGame();
+                Telegram.MainButton.hide();
+            });
 
-    Telegram.showAlert(message, () => {});
+        Telegram.showAlert(message, () => {});
+    } else {
+        // Для обычного браузера показываем кнопку "Новая игра"
+        const newGameBtn = document.getElementById('newGameBtn');
+        if (newGameBtn) {
+            newGameBtn.style.display = 'block';
+            // Обновляем цвет кнопки в зависимости от результата
+            if (gameState.winner === 'X') {
+                newGameBtn.style.backgroundColor = '#2196F3';
+            } else if (gameState.winner === 'O') {
+                newGameBtn.style.backgroundColor = '#f44336';
+            } else {
+                newGameBtn.style.backgroundColor = '#4CAF50';
+            }
+        }
+        alert(message);
+    }
 };
 
 const updateScore = () => {
@@ -168,13 +242,35 @@ const sendGameScore = async (score) => {
     }
 };
 
-// Event Listeners
-elements.board.addEventListener('click', (e) => {
-    const cellContainer = e.target.closest('.cell-container');
-    if (cellContainer) {
-        handleMove(cellContainer.dataset.index);
+// Инициализация при загрузке DOM
+document.addEventListener('DOMContentLoaded', () => {
+    // Инициализируем элементы
+    initElements();
+    
+    // Проверяем, что элементы найдены
+    if (!elements.board) {
+        console.error('Board element not found!');
+        return;
     }
+    
+    // Event Listeners для игрового поля
+    elements.board.addEventListener('click', (e) => {
+        // Ищем ближайший cell-container
+        const cellContainer = e.target.closest('.cell-container');
+        if (cellContainer && cellContainer.dataset.index !== undefined) {
+            const index = parseInt(cellContainer.dataset.index);
+            handleMove(index);
+        }
+    });
+    
+    // Обработчик кнопки "Новая игра" для обычного браузера
+    const newGameBtn = document.getElementById('newGameBtn');
+    if (newGameBtn) {
+        newGameBtn.addEventListener('click', () => {
+            initializeGame();
+        });
+    }
+    
+    // Инициализация игры
+    initializeGame();
 });
-
-// Инициализация при загрузке
-initializeGame();
