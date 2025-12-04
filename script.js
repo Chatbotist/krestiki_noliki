@@ -25,6 +25,17 @@ if (isTelegramWebApp) {
     try {
         Telegram.ready();
         Telegram.expand();
+        
+        // Отключаем кнопку "Поделиться" и другие ненужные функции
+        if (Telegram.disableClosingConfirmation) {
+            Telegram.disableClosingConfirmation();
+        }
+        
+        // Отключаем предложение поделиться
+        if (Telegram.BackButton) {
+            Telegram.BackButton.hide();
+        }
+        
     } catch (e) {
         console.warn('Telegram WebApp init error:', e);
     }
@@ -43,7 +54,6 @@ if (isTelegramWebApp) {
     safeCall('requestFullscreen');
     safeCall('disableVerticalSwipes');
     safeCall('lockOrientation', 'portrait');
-    safeCall('enableClosingConfirmation');
 }
 
 // Получение параметров из URL для Telegram Game
@@ -119,6 +129,8 @@ const initializeGame = () => {
     if (isTelegramWebApp) {
         try {
             Telegram.MainButton.hide();
+            // Очищаем обработчики при инициализации новой игры
+            Telegram.MainButton.offClick();
         } catch (e) {
             console.warn('MainButton.hide error:', e);
         }
@@ -159,9 +171,10 @@ const checkResult = () => {
         gameState.winner = gameState.currentPlayer;
         gameState.score[gameState.currentPlayer]++;
         
-        // Для Telegram Game: игрок всегда играет за X, отправляем счет только при победе X
-        if (isTelegramGame && gameState.currentPlayer === 'X') {
-            gameState.totalWins++;
+        // Для Telegram Game: отправляем счет при любой победе (игра на двоих)
+        if (isTelegramGame) {
+            // Считаем общее количество побед для отправки в Telegram
+            gameState.totalWins = Math.max(gameState.score.X, gameState.score.O);
             sendGameScore(gameState.totalWins);
         }
         
@@ -173,9 +186,7 @@ const checkResult = () => {
         endGame('Ничья!');
     } else {
         gameState.currentPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
-        if (!isTelegramWebApp) {
-            updateCurrentPlayerIndicator();
-        }
+        updateCurrentPlayerIndicator();
     }
 };
 
@@ -211,19 +222,30 @@ const endGame = (message) => {
         if (gameState.winner === 'X') buttonColor = '#2196F3';
         if (gameState.winner === 'O') buttonColor = '#f44336';
 
-        Telegram.MainButton
-            .setParams({
-                color: buttonColor,
-                text_color: '#ffffff',
-                text: 'Новая игра'
-            })
-            .show()
-            .onClick(() => {
-                initializeGame();
-                Telegram.MainButton.hide();
-            });
+        try {
+            // Очищаем предыдущие обработчики
+            Telegram.MainButton.offClick();
+            
+            Telegram.MainButton
+                .setParams({
+                    color: buttonColor,
+                    text_color: '#ffffff',
+                    text: '🔄 Новая игра'
+                })
+                .show()
+                .onClick(() => {
+                    initializeGame();
+                    Telegram.MainButton.hide();
+                });
+        } catch (e) {
+            console.warn('MainButton error:', e);
+        }
 
-        Telegram.showAlert(message, () => {});
+        try {
+            Telegram.showAlert(message, () => {});
+        } catch (e) {
+            alert(message);
+        }
     } else {
         // Для обычного браузера обновляем кнопку "Новая игра"
         const newGameBtn = document.getElementById('newGameBtn');
@@ -252,17 +274,20 @@ const updateScore = () => {
     }
 };
 
-// Обновление индикатора текущего игрока для обычного браузера
+// Обновление индикатора текущего игрока
 const updateCurrentPlayerIndicator = () => {
-    if (!isTelegramWebApp) {
-        const currentPlayerIndicator = document.getElementById('currentPlayerIndicator');
-        if (currentPlayerIndicator) {
-            const playerName = gameState.currentPlayer === 'X' ? 'Крестики' : 'Нолики';
-            const playerIcon = gameState.currentPlayer === 'X' 
-                ? '<i class="fas fa-times"></i>' 
-                : '<i class="far fa-circle"></i>';
-            currentPlayerIndicator.innerHTML = `${playerIcon} Ход: ${playerName}`;
-            currentPlayerIndicator.className = `current-player-indicator ${gameState.currentPlayer}`;
+    const currentPlayerIndicator = document.getElementById('currentPlayerIndicator');
+    if (currentPlayerIndicator) {
+        const playerName = gameState.currentPlayer === 'X' ? 'Крестики' : 'Нолики';
+        const playerIcon = gameState.currentPlayer === 'X' 
+            ? '<i class="fas fa-times"></i>' 
+            : '<i class="far fa-circle"></i>';
+        currentPlayerIndicator.innerHTML = `${playerIcon} Ход: ${playerName}`;
+        currentPlayerIndicator.className = `current-player-indicator ${gameState.currentPlayer}`;
+        
+        // Показываем индикатор только в обычном браузере
+        if (!isTelegramWebApp) {
+            currentPlayerIndicator.style.display = 'block';
         }
     }
 };
@@ -347,6 +372,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentPlayerIndicator = document.getElementById('currentPlayerIndicator');
         if (currentPlayerIndicator) {
             currentPlayerIndicator.style.display = 'none';
+        }
+        
+        // Дополнительная настройка для Telegram Game
+        if (isTelegramGame) {
+            // Убеждаемся, что MainButton работает правильно
+            try {
+                Telegram.MainButton.hide();
+            } catch (e) {
+                console.warn('MainButton init error:', e);
+            }
         }
     } else {
         // В обычном браузере показываем все наши элементы управления
