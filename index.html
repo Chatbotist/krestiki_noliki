@@ -60,6 +60,44 @@
             <button id="newGameBtn" class="new-game-btn" style="display: block;">Новая игра</button>
         </div>
     </div>
+
+    <!-- Кастомные модальные окна -->
+    <div id="customModal" class="custom-modal" style="display: none;">
+        <div class="custom-modal-content">
+            <div class="custom-modal-header">
+                <h3 id="modalTitle">Уведомление</h3>
+            </div>
+            <div class="custom-modal-body">
+                <p id="modalMessage"></p>
+            </div>
+            <div class="custom-modal-footer" id="modalFooter">
+                <button id="modalOkBtn" class="modal-btn modal-btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения -->
+    <div id="customConfirmModal" class="custom-modal" style="display: none;">
+        <div class="custom-modal-content">
+            <div class="custom-modal-header">
+                <h3 id="confirmTitle">Подтверждение</h3>
+            </div>
+            <div class="custom-modal-body">
+                <p id="confirmMessage"></p>
+            </div>
+            <div class="custom-modal-footer">
+                <button id="confirmCancelBtn" class="modal-btn modal-btn-secondary">Отмена</button>
+                <button id="confirmOkBtn" class="modal-btn modal-btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Индикатор ожидания -->
+    <div id="waitingIndicator" class="waiting-indicator" style="display: none;">
+        <div class="waiting-spinner"></div>
+        <p id="waitingText">Ожидание...</p>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
